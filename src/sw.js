@@ -31,17 +31,51 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  console.log('fetching');
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      if (response) {
-        return response;                              // If file is in cache, return that.
-      } else {
-        return fetch(event.request)                   // Otherwise, request file from network.
-        .catch((error) => {                           // If that doesn't work,
-          return caches.match('/offline.html');       // serve offline page from cache.
-        });
-      }
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.match(event.request).then((response) => {      // Respond with whatever this promise resolves to.
+        if (response) {
+          return response;                                        // If file is in cache, return that.
+        } else {                                                  // Otherwise...
+          const fetchPromise = fetch(event.request)               // Attempt to fetch data from network
+          .catch((error) => {                                     // If that doesn't work...
+            console.log(error);
+            return caches.match('/offline.html');                 // Respond with an offline page
+          })
+          .then((networkResponse) => {                            // If network fetch succeeded, though...
+            cache.put(event.request, networkResponse.clone());    // First add page to cache,
+            return networkResponse;                               // and then respond with result from fetch
+          });
+          return fetchPromise;
+        }
+      })
     })
   );
 });
+
+// self.addEventListener('activate', (event) => {
+//   event.waitUntil(
+//     caches.keys().then((cacheNames) => {
+//       return Promise.all(
+//         cacheNames.filter(() => true)
+//         .map((cacheName) => caches.delete(cacheName))
+//       );
+//     })
+//   );
+// })
+
+// This is essentially the stale-while-revalidate strategy
+// self.addEventListener('fetch', (event) => {
+//   console.log('fetching', event.request.url);
+//   event.respondWith(
+//     caches.open(CACHE_NAME).then((cache) => {
+//       return cache.match(event.request).then((response) => {
+//         const fetchPromise = fetch(event.request).then((networkResponse) => {
+//           cache.put(event.request, networkResponse.clone());
+//           return networkResponse;
+//         })
+//         return response || fetchPromise;
+//       })
+//     })
+//   );
+// });
