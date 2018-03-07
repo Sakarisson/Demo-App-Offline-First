@@ -33,6 +33,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.open(CACHE_NAME).then((cache) => {
+      let offline = false;
       return cache.match(event.request).then((response) => {      // Respond with whatever this promise resolves to.
         if (response) {
           return response;                                        // If file is in cache, return that.
@@ -40,11 +41,14 @@ self.addEventListener('fetch', (event) => {
           const fetchPromise = fetch(event.request)               // Attempt to fetch data from network
           .catch((error) => {                                     // If that doesn't work...
             console.log(error);
+            offline = true;
             return caches.match('/offline.html');                 // Respond with an offline page
           })
-          .then((networkResponse) => {                            // If network fetch succeeded, though...
-            cache.put(event.request, networkResponse.clone());    // First add page to cache,
-            return networkResponse;                               // and then respond with result from fetch
+          .then((response) => {
+            if (!offline) {                                       // If network fetch succeeded, though...
+              cache.put(event.request, response.clone());         // First add page to cache,
+            }
+            return response;                                      // and then respond with result from fetch
           });
           return fetchPromise;
         }
